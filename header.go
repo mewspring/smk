@@ -147,7 +147,7 @@ func (info TrackInfo) IsCompressed() bool {
 // sound compression.
 func (info TrackInfo) IsVersion2() bool {
 	// bits 27-26 - if both set to zero - use v2 sound decompression
-	return info&0x3000000 == 0
+	return info&0xC000000 == 0
 }
 
 // FrameType describes the contents of the corresponding frame.
