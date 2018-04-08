@@ -34,8 +34,8 @@ type FileHeader struct {
 	FrameRate FrameRate `struc:"int32,little"`
 	// Video flags.
 	Flags Flag
-	// Size of the largest unpacked audio data buffer in bytes; one per channel.
-	AudioSize []int `struc:"[7]uint32,little"`
+	// Size of the largest unpacked audio data buffer in bytes; one per track.
+	AudioSize [7]int `struc:"[7]uint32,little"`
 	// Total size in bytes of Huffman trees stored in file.
 	TreesSize int `struc:"uint32,little"`
 	// Allocation size for the mono blocks maps Huffman tree.
@@ -46,9 +46,9 @@ type FileHeader struct {
 	FullSize int `struc:"uint32,little"`
 	// Allocation size for the block type descriptors Huffman tree.
 	TypeSize int `struc:"uint32,little"`
-	// Frequency and format information for each sound track; one per channel.
+	// Frequency and format information for each sound track; one per track.
 	// TODO: Verify if little or big endian encoding.
-	AudioRate []AudioRate `struc:"[7]uint32,little"`
+	TrackInfo [7]TrackInfo `struc:"[7]uint32,little"`
 	// Unused.
 	_ uint32
 	// Frame size in number of bytes. Bit 0 determines if the frame is a key
@@ -90,7 +90,7 @@ type Flag uint32
 // Video flags.
 const ()
 
-// AudioRate describes the frequency and format information of a sound track.
+// TrackInfo describes the frequency and format information of a sound track.
 //
 // The 32 constituent bits have the following meaning:
 //
@@ -101,10 +101,54 @@ const ()
 //    bits 27-26 - if both set to zero - use v2 sound decompression
 //    bits 25-24 - unused
 //    bits 23-0 - audio sample rate
-type AudioRate uint32
+type TrackInfo uint32
 
-// Audio rates.
-const ()
+// SampleRate returns the audio sample rate of the track.
+func (info TrackInfo) SampleRate() int {
+	// bits 23-0 - audio sample rate
+	return int(info & 0xFFFFFF)
+}
+
+// BitRate returns the bit rate of the audio data of the track.
+func (info TrackInfo) BitRate() int {
+	// bit 29 - 1 = 16-bit audio; 0 = 8-bit audio
+	if info&0x20000000 != 0 {
+		// 16-bit audio.
+		return 16
+	}
+	// 8-bit audio.
+	return 8
+}
+
+// NChannels returns the number of channels used by the track.
+func (info TrackInfo) NChannels() int {
+	// bit 28 - 1 = stereo audio; 0 = mono audio
+	if info&0x10000000 != 0 {
+		// stero audio.
+		return 2
+	}
+	// mono audio.
+	return 1
+}
+
+// HasAudioData reports whether the audio data of the track is present.
+func (info TrackInfo) HasAudioData() bool {
+	// bit 30 - indicates that audio data is present for this track
+	return info&0x40000000 != 0
+}
+
+// IsCompressed reports whether the audio data of the track is compressed.
+func (info TrackInfo) IsCompressed() bool {
+	// bit 31 - data is compressed
+	return info&0x80000000 != 0
+}
+
+// IsVersion2 reports whether the audio data of the track is stored using v2
+// sound compression.
+func (info TrackInfo) IsVersion2() bool {
+	// bits 27-26 - if both set to zero - use v2 sound decompression
+	return info&0x3000000 == 0
+}
 
 // FrameType describes the contents of the corresponding frame.
 //
@@ -121,4 +165,13 @@ const ()
 type FrameType uint8
 
 // Frame types.
-const ()
+const (
+	FrameTypePaletteRecord FrameType = 1 << iota
+	FrameTypeAudioDataTrack0
+	FrameTypeAudioDataTrack1
+	FrameTypeAudioDataTrack2
+	FrameTypeAudioDataTrack3
+	FrameTypeAudioDataTrack4
+	FrameTypeAudioDataTrack5
+	FrameTypeAudioDataTrack6
+)
